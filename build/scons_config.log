@@ -1,0 +1,3 @@
+file /home/fan/Projects/HPC/CS6290/sesc/SConstruct,line 309:
+	Configure(confdir = build/.scons_config)
+
