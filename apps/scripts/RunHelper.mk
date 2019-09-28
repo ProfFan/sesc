@@ -1,12 +1,12 @@
 all.strbuild  = runsim
 #all.simenv    = SESC_procsPerNode="[numcpu]"
-all.simname   = ~/sesc/sesc.opt
+all.simname   = $(PWD)/../../sesc/sesc.opt
 all.numcpu    = 1
 all.numthread = 1
 all.strsuffix = .mipseb
 
 noc.base      =
-noc.simopts   = -c ~/sesc/confs/cmp[numcpu]-noc.conf <>
+noc.simopts   = -c $(PWD)/../../sesc/confs/cmp[numcpu]-noc.conf <>
 
 ff.base       =
 ff.simopts    = -w1000000000000 <>
@@ -21,7 +21,7 @@ t1.numthread  = 1
 p1.base       =
 p1.numcpu     = 1
 
-t2. base      =
+t2.base      =
 t2.numthread  = 2
 
 p2.base       =
@@ -93,7 +93,7 @@ mipseb64.strendianc = b
 mipsel.base       =
 mipsel.strsuffix  = .mipsel
 mipsel.strendianc = l
-mipsel.strroot    = /home/milos/sim/mipselroot
+mipsel.strroot    = $(PWD)/../../mipselroot
 
 mipsel64.base       =
 mipsel64.strsuffix  = .mipsel64

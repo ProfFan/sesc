@@ -1,6 +1,6 @@
 # This is where MINT, SESC and other directories are
-ANLMACROS   := $(HOME)/sesc/apps/scripts/pthread.m4.stougie
-MIPSCCPFX   := /mipsroot/cross-tools/bin/mips-unknown-linux-gnu-
+ANLMACROS   := $(PWD)/../../../../sesc/apps/scripts/pthread.m4.stougie
+MIPSCCPFX   := $(PWD)/../../../../mipsroot/cross-tools/bin/mips-unknown-linux-gnu-
 X86CCDIR    := /usr
 
 ifndef TARGET
@@ -34,7 +34,7 @@ ifeq ($(SYSTEM),Linux)
     #  GFLAGS  += -fno-delayed-branch -fno-omit-frame-pointer 
 
     # ISA and ABI
-    GFLAGS  += -static
+    GFLAGS  += -static --sysroot=$(PWD)/../../../../mipsroot/
     ifneq ($(filter $(ExeType),mipseb mipsel mipseb64 mipsel64 mipseb-nopad),)
       # GFLAGS  += -mno-abicalls
       # GFLAGS  += -mno-abicalls
@@ -56,8 +56,8 @@ ifeq ($(SYSTEM),Linux)
       GFLAGS += -DNO_PADDING
     endif	
     GCFLAGS  += $(GFLAGS)
-    LFLAGS   += $(GFLAGS) $(LFLAGS.Linux) -lpthread
-    GCFLAGS  += -I$(APPOBJDIR)/$(ExeType)/
+    LFLAGS   += $(GFLAGS) $(LFLAGS.Linux) -lpthread -L$(PWD)/../../../../mipsroot/tools/lib/
+    GCFLAGS  += -I$(APPOBJDIR)/$(ExeType)/ -I$(PWD)/../../../../include -I$(PWD)/../../../../include/i386-linux-gnu
     CFLAGS   += $(GCFLAGS) $(CFLAGS.Linux)
     CPPFLAGS += $(GCFLAGS)
     FFLAGS   += $(GFLAGS)
