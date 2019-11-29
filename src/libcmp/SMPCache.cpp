@@ -21,6 +21,7 @@ Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 #include "SMPCache.h"
 #include "SMPCacheState.h"
+#include "SMPProtocol.h"
 #include "libmem/Cache.h"
 
 #include "MESIProtocol.h"
@@ -88,6 +89,9 @@ SMPCache::SMPCache(SMemorySystem *dms, const char *section, const char *name)
     , writeMiss("%s:writeMiss", name)
     , readHalfMiss("%s:readHalfMiss", name)
     , writeHalfMiss("%s:writeHalfMiss", name)
+    , compMiss("%s:compMiss", name)
+    , capMiss("%s:capMiss", name)
+    , confMiss("%s:confMiss", name)
     , writeBack("%s:writeBack", name)
     , linePush("%s:linePush", name)
     , lineFill("%s:lineFill", name)
@@ -131,6 +135,8 @@ SMPCache::SMPCache(SMemorySystem *dms, const char *section, const char *name)
 
     cache = CacheType::create(section, "", name);
     I(cache);
+
+    lruSize = SescConf->getInt(section, "size") / SescConf->getInt(section, "bsize");
 
     const char *prot = SescConf->getCharPtr(section, "protocol");
     if(!strcasecmp(prot, "MESI")) {
@@ -429,6 +435,28 @@ void SMPCache::read(MemRequest *mreq)
     doReadCB::scheduleAbs(nextSlot(), this, mreq);
 }
 
+bool SMPCache::lruAccess(PAddr tag)  {
+    bool found = false;
+    if (lruIndices.find(tag) == lruIndices.end()) { 
+        if (lruTags.size() == lruSize) { 
+            PAddr last = lruTags.back();
+            lruTags.pop_back();
+            lruIndices.erase(last); 
+        }
+
+        found = false;
+    } else {
+        lruTags.erase(lruIndices[tag]);
+        
+        found = true;
+    }
+    
+    lruTags.push_front(tag); 
+    lruIndices[tag] = lruTags.begin();
+
+    return found;
+}
+
 void SMPCache::doRead(MemRequest *mreq)
 {
     PAddr addr = mreq->getPAddr();
@@ -449,6 +477,12 @@ void SMPCache::doRead(MemRequest *mreq)
 #endif
         outsReq->retire(addr);
         mreq->goUp(hitDelay);
+        
+        if(accessedTags.find(calcTag(addr)) == accessedTags.end()) { // Infinity Cache
+            accessedTags.insert(calcTag(addr));
+        }
+                
+        lruAccess(calcTag(addr));
         return;
     }
 
@@ -465,6 +499,15 @@ void SMPCache::doRead(MemRequest *mreq)
     GI(l, !l->isLocked());
 
     readMiss.inc();
+
+    if(accessedTags.find(calcTag(addr)) == accessedTags.end()) { // Compulsory Miss
+        compMiss.inc();
+        accessedTags.insert(calcTag(addr));
+    } else if(lruAccess(calcTag(addr)) == false) { // Capacity
+        capMiss.inc();
+    } else {
+        confMiss.inc();
+    }
 
 #if (defined TRACK_MPKI)
     DInst *dinst = mreq->getDInst();
@@ -524,6 +567,13 @@ void SMPCache::doWriteAgain(MemRequest *mreq) {
         protocol->makeDirty(l);
         outsReq->retire(addr);
         mreq->goUp(hitDelay);
+
+        if(accessedTags.find(calcTag(addr)) == accessedTags.end()) { // Infinity Cache
+            accessedTags.insert(calcTag(addr));
+        }
+                
+        lruAccess(calcTag(addr));
+        
         return;
     } else {
         IJ(0);
@@ -548,6 +598,13 @@ void SMPCache::doWrite(MemRequest *mreq)
         protocol->makeDirty(l);
         outsReq->retire(addr);
         mreq->goUp(hitDelay);
+
+        if(accessedTags.find(calcTag(addr)) == accessedTags.end()) { // Infinity Cache
+            accessedTags.insert(calcTag(addr));
+        }
+
+        lruAccess(calcTag(addr));
+
         return;
     }
 
@@ -576,6 +633,15 @@ void SMPCache::doWrite(MemRequest *mreq)
     }
 
     writeMiss.inc();
+
+    if(accessedTags.find(calcTag(addr)) == accessedTags.end()) { // Compulsory Miss
+        compMiss.inc();
+        accessedTags.insert(calcTag(addr));
+    } else if(lruAccess(calcTag(addr)) == false) { // Capacity
+        capMiss.inc();
+    } else {
+        confMiss.inc();
+    }
 
 #ifdef SESC_ENERGY
     wrEnergy[1]->inc();

@@ -89,6 +89,11 @@ protected:
     GStatsCntr readHalfMiss;  // attention: these half misses have a != semantic
     GStatsCntr writeHalfMiss; // than Cache.cpp: these counts are included in
     // other counters because MSHR is used differently
+
+    GStatsCntr compMiss;
+    GStatsCntr capMiss;
+    GStatsCntr confMiss;
+
     GStatsCntr writeBack;
     GStatsCntr linePush;
     GStatsCntr lineFill;
@@ -170,6 +175,12 @@ public:
     void pStat();
 
 #endif
+    std::unordered_set<PAddr> accessedTags;
+    std::list<PAddr> lruTags;
+    std::unordered_map<PAddr, std::list<PAddr>::iterator> lruIndices;
+    int lruSize;
+
+    bool lruAccess(PAddr x);
 
     //static std::set<SMPMemRequest*> detourSet;
     //static std::map<SMPMemRequest*, SMPMemRequest*> replaceMap;
