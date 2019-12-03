@@ -89,9 +89,16 @@ SMPCache::SMPCache(SMemorySystem *dms, const char *section, const char *name)
     , writeMiss("%s:writeMiss", name)
     , readHalfMiss("%s:readHalfMiss", name)
     , writeHalfMiss("%s:writeHalfMiss", name)
-    , compMiss("%s:compMiss", name)
-    , capMiss("%s:capMiss", name)
-    , confMiss("%s:confMiss", name)
+    , readCompMiss("%s:readCompMiss", name)
+    , readCapMiss("%s:readCapMiss", name)
+    , readConfMiss("%s:readConfMiss", name)
+    , readCoheMiss("%s:readCoheMiss", name)
+    , readReplMiss("%s:readReplMiss", name)
+    , writeCompMiss("%s:writeCompMiss", name)
+    , writeCapMiss("%s:writeCapMiss", name)
+    , writeConfMiss("%s:writeConfMiss", name)
+    , writeCoheMiss("%s:writeCoheMiss", name)
+    , writeReplMiss("%s:writeReplMiss", name)
     , writeBack("%s:writeBack", name)
     , linePush("%s:linePush", name)
     , lineFill("%s:lineFill", name)
@@ -499,16 +506,24 @@ void SMPCache::doRead(MemRequest *mreq)
     GI(l, !l->isLocked());
 
     readMiss.inc();
-
-    if(accessedTags.find(calcTag(addr)) == accessedTags.end()) { // Compulsory Miss
-        compMiss.inc();
-        accessedTags.insert(calcTag(addr));
-    } else if(lruAccess(calcTag(addr)) == false) { // Capacity
-        capMiss.inc();
+    if(l && (l->getState() & (DMESI_TRANS | SMP_INV_BIT))) {
+        readCoheMiss.inc();
     } else {
-        confMiss.inc();
-    }
+        if(invalidTags.find(calcTag(addr)) != invalidTags.end()) {
+            readCoheMiss.inc();
+        } else if(accessedTags.find(calcTag(addr)) == accessedTags.end()) { // Compulsory Miss
+            readCompMiss.inc();
+            accessedTags.insert(calcTag(addr));
+        } else {
+            readReplMiss.inc();
 
+            if(lruAccess(calcTag(addr)) == false) { // Capacity
+                readCapMiss.inc();
+            } else {
+                readConfMiss.inc();
+            }
+        }
+    }
 #if (defined TRACK_MPKI)
     DInst *dinst = mreq->getDInst();
     if(dinst) {
@@ -634,13 +649,23 @@ void SMPCache::doWrite(MemRequest *mreq)
 
     writeMiss.inc();
 
-    if(accessedTags.find(calcTag(addr)) == accessedTags.end()) { // Compulsory Miss
-        compMiss.inc();
-        accessedTags.insert(calcTag(addr));
-    } else if(lruAccess(calcTag(addr)) == false) { // Capacity
-        capMiss.inc();
+    if(l && (l->getState() == DMESI_SHARED || l->getState() == DMESI_INVALID)) {
+        writeCoheMiss.inc();
     } else {
-        confMiss.inc();
+        if(invalidTags.find(calcTag(addr)) != invalidTags.end()) {
+            writeCoheMiss.inc();
+        } else if(accessedTags.find(calcTag(addr)) == accessedTags.end()) { // Compulsory Miss
+            writeCompMiss.inc();
+            accessedTags.insert(calcTag(addr));
+        } else {
+            writeReplMiss.inc();
+
+            if(lruAccess(calcTag(addr)) == false) { // Capacity
+                writeCapMiss.inc();
+            } else {
+                writeConfMiss.inc();
+            }
+        }
     }
 
 #ifdef SESC_ENERGY
@@ -774,6 +799,8 @@ void SMPCache::realInvalidate(PAddr addr, ushort size, bool writeBack)
                     doWriteBack(addr);
             }
             l->invalidate();
+
+            invalidTags.insert(l->oldTag);
         }
         addr += cache->getLineSize();
         size -= cache->getLineSize();
@@ -1623,6 +1650,8 @@ void SMPCache::concludeAccess(MemRequest *mreq)
                        , getSymbolicName(), addr, globalClock);
         
 		l->invalidate();
+
+        invalidTags.insert(l->oldTag);
         pendingInv.erase(taddr);
     }
 
@@ -1746,6 +1775,11 @@ SMPCache::Line *SMPCache::allocateLine(PAddr addr, CallbackBase *cb,
     if(!l->isValid()) {
         if(canDestroyCB)
             cb->destroy();
+        
+        if(auto it = invalidTags.find(l->oldTag) != invalidTags.end()) {
+            invalidTags.erase(it);
+        }
+
         l->setTag(cache->calcTag(addr));
         DEBUGPRINT("   [%s] allocated free line for %x at %lld \n",
                    getSymbolicName(), addr , globalClock);

@@ -53,6 +53,8 @@ protected:
     // JJO
     bool TS;
 public:
+    PAddr oldTag;
+public:
     SMPCacheState()
         : StateGeneric<>() {
         state = SMP_INVALID;
@@ -72,6 +74,16 @@ public:
         clearTag();
         state = SMP_INVALID;
         TS = false;
+    }
+
+    void clearTag() {
+        oldTag = tag;
+        StateGeneric<>::clearTag();
+    }
+
+    void setTag(uint a) {
+        oldTag = tag;
+        StateGeneric<>::setTag(a);
     }
 
     bool isLocked() const {

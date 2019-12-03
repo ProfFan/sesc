@@ -378,7 +378,7 @@ public:
 
 template<class Addr_t=uint32_t>
 class StateGeneric {
-private:
+protected:
     Addr_t tag;
 
 public:

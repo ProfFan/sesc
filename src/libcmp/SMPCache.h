@@ -90,9 +90,17 @@ protected:
     GStatsCntr writeHalfMiss; // than Cache.cpp: these counts are included in
     // other counters because MSHR is used differently
 
-    GStatsCntr compMiss;
-    GStatsCntr capMiss;
-    GStatsCntr confMiss;
+    GStatsCntr readCompMiss;
+    GStatsCntr readCapMiss;
+    GStatsCntr readConfMiss;
+    GStatsCntr readCoheMiss;
+    GStatsCntr readReplMiss;
+
+    GStatsCntr writeCompMiss;
+    GStatsCntr writeCapMiss;
+    GStatsCntr writeConfMiss;
+    GStatsCntr writeCoheMiss;
+    GStatsCntr writeReplMiss;
 
     GStatsCntr writeBack;
     GStatsCntr linePush;
@@ -182,6 +190,8 @@ public:
 
     bool lruAccess(PAddr x);
 
+    std::unordered_set<PAddr> invalidTags;
+    
     //static std::set<SMPMemRequest*> detourSet;
     //static std::map<SMPMemRequest*, SMPMemRequest*> replaceMap;
 
